@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador Mutual - Fundacion Redes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 100%;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+        
+        .result.inactive {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+        
+        .result-title {
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .result-detail {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .benefit-highlight {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 10px 0;
+            color: #28a745;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            margin-top: 15px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>Mutual Fundacion Redes</h1>
+            <p>Verificador de Socios</p>
+        </div>
+        
+        <form id="verifyForm">
+            <div class="form-group">
+                <label for="dni">Numero de Documento (DNI)</label>
+                <input 
+                    type="text" 
+                    id="dni" 
+                    name="dni" 
+                    placeholder="Ej: 12345678"
+                    required
+                    pattern="[0-9]{7,8}"
+                    maxlength="8"
+                >
+            </div>
+            
+            <button type="submit" id="submitBtn">Verificar Socio</button>
+        </form>
+        
+        <div class="loading" id="loading">
+            Consultando...
+        </div>
+        
+        <div class="result" id="result"></div>
+        
+        <div class="footer">
+            Sistema de verificacion v1.0
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURACION: Reemplaza esta URL con tu Web App de Google Sheets
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyp6ezSjA7zyO_9BkJuUl3-9tawfdqKOSWyB-cbofXsIe309b-6ql4HB7yhBWZb4ZKPMA/exec';
+        
+        const form = document.getElementById('verifyForm');
+        const dniInput = document.getElementById('dni');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const resultDiv = document.getElementById('result');
+        
+        // Solo permitir numeros en el campo DNI
+        dniInput.addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+        
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const dni = dniInput.value.trim();
+            
+            if (!dni || dni.length < 7) {
+                showResult('error', 'Error', 'Por favor ingrese un DNI valido (7-8 digitos).');
+                return;
+            }
+            
+            // Mostrar loading
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.style.display = 'none';
+            
+            try {
+                // Consultar Google Sheets
+                const response = await fetch(GOOGLE_SCRIPT_URL + '?dni=' + dni);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.socio.estado === 'Activo') {
+                        showResult(
+                            'success',
+                            'Socio Activo',
+                            '<div class="benefit-highlight">' + data.socio.beneficio + '</div>' +
+                            '<div class="result-detail">' +
+                            '<strong>Nombre:</strong> ' + data.socio.nombre + '<br>' +
+                            '<strong>Vigencia:</strong> ' + data.socio.vigencia +
+                            '</div>'
+                        );
+                    } else {
+                        showResult(
+                            'inactive',
+                            'Socio No Activo',
+                            'El socio existe pero su estado es: <strong>' + data.socio.estado + '</strong>'
+                        );
+                    }
+                } else {
+                    showResult(
+                        'error',
+                        'No es Socio',
+                        'El DNI consultado no esta registrado en la mutual.'
+                    );
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showResult(
+                    'error',
+                    'Error de Conexion',
+                    'No se pudo consultar la base de datos. Verifique su conexion a internet.'
+                );
+            } finally {
+                submitBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+        
+        function showResult(type, title, content) {
+            resultDiv.className = 'result ' + type;
+            resultDiv.innerHTML = '<div class="result-title">' + title + '</div>' +
+                                  '<div class="result-detail">' + content + '</div>';
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
